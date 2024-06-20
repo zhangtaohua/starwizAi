@@ -3,8 +3,6 @@ import os
 import matplotlib.pyplot as plt
 from osgeo import gdal, ogr, osr
 
-os.environ["PROJ_LIB"] = r"C:\Python312\Lib\site-packages\pyproj\proj_dir\share\proj"
-
 
 def correct_tiff_with_extent_and_srs(src_ds, width, height, bbox, srs_epsg=4326):
 

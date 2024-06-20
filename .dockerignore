@@ -1,0 +1,16 @@
+.git
+.vscode
+.DS_Store
+.DS_Store?
+build/images
+tmp
+.tmp/
+.dockerignore
+.editorconfig
+.env.debug
+.env.example
+.gitignore
+db.sqlite3
+Makefile
+readme.md
+README.md

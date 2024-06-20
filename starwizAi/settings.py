@@ -11,7 +11,27 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
+import platform
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# 加载 .env 文件
+env_path = Path(".") / ".env"
+
+load_dotenv(dotenv_path=env_path)
+
+
+# 判断当前操作系统
+current_os = platform.system()
+
+if current_os == "Windows":
+    os.environ["PROJ_LIB"] = r"C:\Python312\Lib\site-packages\pyproj\proj_dir\share\proj"
+# elif current_os == "Linux":
+#     os.environ["PROJ_LIB"] = r"/usr/local/lib/python3.12/site-packages/pyproj/proj_dir/share/proj"
+# elif current_os == "Darwin":
+#     os.environ["PROJ_LIB"] = r"/usr/local/lib/python3.12/site-packages/pyproj/proj_dir/share/proj"
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,13 +41,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-dt8)#uk62v_xzund$4!2iyk9#800m9dgueh2qe^f*mtohvh^z="
+# SECRET_KEY = "#uk62v_xzund$4!2iyk9#800fmurj9d861RJxkrisinigueh2qe^f*mtohvh^z="
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "#uk62v_xzund$4!2iyk9#800fmurj9d861RJxkrisinigueh2qe^f*mtohvh^z=")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG = False
+DEBUG = bool(os.environ.get("DJANGO_DEBUG", True))
 
 ALLOWED_HOSTS = []
-
+# ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS_STR = os.getenv("DJANGO_ALLOWED_HOSTS")
+if ALLOWED_HOSTS_STR:
+    ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(" ")
 
 # Application definition
 
@@ -86,7 +111,7 @@ DATABASES = {
         "NAME": "aidb",  # 数据库名称
         "USER": "postgres",  # 登录数据库用户名
         "PASSWORD": "123456",  # 登录数据库密码
-        "HOST": "127.0.0.1",  # 数据库服务器的主机地址
+        "HOST": "192.168.3.100",  # 数据库服务器的主机地址
         "PORT": "5432",  # 数据库服务的端口号
     },
 }
@@ -154,7 +179,7 @@ Q_CLUSTER = {
     "cpu_affinity": 1,
     "label": "Django Q2",
     "redis": {
-        "host": "127.0.0.1",
+        "host": "192.168.3.100",
         "port": 6379,
         "db": 1,
     },
@@ -173,8 +198,8 @@ Q_CLUSTER = {
 }
 
 # CUSTOM VAR
-DOWNLOAD_TIFF_URL = "http://localhost:5177/static/assets/ai/downloads/tiff/"
-AI_RESULTS_URL = "http://localhost:5177/static/assets/ai/results/"
+DOWNLOAD_TIFF_URL = "http://192.168.3.100:5177/static/assets/ai/downloads/tiff/"
+AI_RESULTS_URL = "http://192.168.3.100:5177/static/assets/ai/results/"
 
 DOWNLOAD_TIFF_PATH = BASE_DIR / "assets/ai/downloads/tiff/"
 AI_RESULTS_PATH = BASE_DIR / "assets/ai/results/"

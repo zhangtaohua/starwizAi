@@ -22,6 +22,10 @@ python3 manage.py startapp ais
 https://www.cnblogs.com/gengyufei/p/12632408.html
 https://github.com/cgohlke/geospatial-wheels/releases/tag/v2024.2.18
 
+whls 
+https://wheelhouse.openquake.org/
+https://girder.github.io/large_image_wheels/
+
 # django-q2
 python3 manage.py migrate django_q
 python3 manage.py qcluster
@@ -44,6 +48,11 @@ https://github.com/cookiecutter/cookiecutter-django
 
 https://github.com/wsvincent/awesome-django
 
+https://testdriven.io/blog/docker-best-practices/#use-multi-stage-builds
+
+
+# 部署
+python3 manage.py check --deploy
 
 # 错误处理
 1、 proj_create_from_database: C:\Program Files\PostgreSQL\13\share\contrib\postgis-3.2\proj\proj.db contains DATABASE.LAYOUT.VERSION.MINOR = 0 whereas a number >= 2 is expected. It comes from another PROJ installation.
@@ -55,3 +64,21 @@ https://github.com/wsvincent/awesome-django
 pip3 install pyproj
 在代码中设置
 os.environ["PROJ_LIB"] = r"C:\Python312\Lib\site-packages\pyproj\proj_dir\share\proj"
+
+
+docker run -d --name test_starwiz_ai_django -v /d/Work/project/Python/starwizAi:/app -p 5177:5177  starwiz_ai_django:prod
+
+# 清空间
+wsl --shutdown
+```
+ diskpart
+# 选择虚拟机文件执行瘦身
+> select vdisk file="C:\Users\13823\AppData\Local\Docker\wsl\data\ext4.vhdx"
+> attach vdisk readonly
+> compact vdisk
+> detach vdisk
+> exit
+
+链接：https://juejin.cn/post/7256966480229646391
+
+```
