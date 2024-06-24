@@ -5,7 +5,7 @@ rem 定义变量
 set USER=hkatg
 set PASSWORD=123456
 set HOST=192.168.3.247
-set REMOTE_DIR=/home/hkatg/rj/
+set REMOTE_DIR=/home/hkatg/app/datawiz-ai-bone
 set SOURCE_DIR=D:\Work\project\Python\starwizAi\*
 
 rem 使用 scp 复制文件

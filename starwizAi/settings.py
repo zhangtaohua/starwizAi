@@ -111,8 +111,8 @@ DATABASES = {
         "NAME": "aidb",  # 数据库名称
         "USER": "postgres",  # 登录数据库用户名
         "PASSWORD": "123456",  # 登录数据库密码
-        "HOST": "192.168.3.100",  # 数据库服务器的主机地址
-        "PORT": "5432",  # 数据库服务的端口号
+        "HOST": "192.168.3.237",  # 数据库服务器的主机地址
+        "PORT": "54327",  # 数据库服务的端口号
     },
 }
 
@@ -179,8 +179,8 @@ Q_CLUSTER = {
     "cpu_affinity": 1,
     "label": "Django Q2",
     "redis": {
-        "host": "192.168.3.100",
-        "port": 6379,
+        "host": "192.168.3.247",
+        "port": 56379,
         "db": 1,
     },
     "ALT_CLUSTERS": {
@@ -198,8 +198,8 @@ Q_CLUSTER = {
 }
 
 # CUSTOM VAR
-DOWNLOAD_TIFF_URL = "http://192.168.3.100:5177/static/assets/ai/downloads/tiff/"
-AI_RESULTS_URL = "http://192.168.3.100:5177/static/assets/ai/results/"
+DOWNLOAD_TIFF_URL = "http://192.168.3.247:5177/static/assets/ai/downloads/tiff/"
+AI_RESULTS_URL = "http://192.168.3.247:5177/static/assets/ai/results/"
 
 DOWNLOAD_TIFF_PATH = BASE_DIR / "assets/ai/downloads/tiff/"
 AI_RESULTS_PATH = BASE_DIR / "assets/ai/results/"

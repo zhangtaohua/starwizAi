@@ -4,7 +4,7 @@
 WINDOWS_DIR="//192.168.3.100/share"
 MOUNT_POINT="/mnt/rj/share"
 # HOME_DIR="/home/$(whoami)/"
-HOME_DIR="/home/datawiz/datawiz-ai/"
+HOME_DIR="/home/hkatg/app/datawiz-ai-bone"
 WINDOWS_USERNAME="RJ"
 WINDOWS_PASSWORD=""
 

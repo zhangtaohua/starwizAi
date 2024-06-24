@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  app:
+    image: starwiz_ai_django:prod
+    container_name: rj_starwiz_ai_django_server
+    restart: always
+    depends_on:
+      - redis
+    network_mode: bridge
+    volumes:
+      - "../:/app/"
+    ports:
+      - "5177:5177"
+  redis:
+      image: redis:7-alpine
+      container_name: rj_starwiz_ai_redis
+      network_mode: bridge
+      restart: always
+      ports:
+        - "56379:6379"
+      command: [ "redis-server", "/etc/redis.conf", "--appendonly", "yes" ]
+      volumes:
+        - ../../running/redis/data:/data
+        - ../../running/redis/redis.conf:/etc/redis.conf
+      healthcheck:
+        test: "redis-cli -h 127.0.0.1 -p 6379 info Replication"
+        interval: 10s
+        timeout: 5s
+        retries: 3
+        start_period: 10s

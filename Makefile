@@ -7,9 +7,8 @@ TEST_CONTAINER_NAME=test_starwiz_ai_django
 
 
 build:
-	docker build -t ${IMAGE_NAME}:prod -f ./build/docker/Dockerfile2 .
-
-# docker save -o ./build/images/${IMAGE_NAME}.tar.gz ${IMAGE_NAME}:prod
+	docker build -t ${IMAGE_NAME}:prod -f ./build/docker/Dockerfile .
+	docker save -o ./build/images/${IMAGE_NAME}.tar.gz ${IMAGE_NAME}:prod
 
 test:
 	docker run -d --name ${TEST_CONTAINER_NAME} -v /d/Work/project/Python/starwizAi:/app	-p 5177:5177  ${IMAGE_NAME}:prod
