@@ -208,6 +208,7 @@ def task_start(input_params):
                 ai_result = get_predict(model_path, output_tiff, output_result_file_name)
                 if ai_result:
                     save_res = {
+                        "base_dir_url": settings.PRODUCT_ASSETS_BASE_DIR,
                         "input_origin_tiff": input_origin_tiff_url,
                         "input_process_tiff": input_process_tiff_url,
                         "output_png": output_png_url,

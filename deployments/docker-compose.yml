@@ -7,7 +7,6 @@ services:
     restart: always
     depends_on:
       - redis
-      - nginx
     network_mode: bridge
     volumes:
       - "../:/app/"
@@ -31,17 +30,17 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-  nginx: 
-    image: nginx:latest
-    container_name: rj_starwiz_ai_django_nginx
-    restart: always
-    ports:
-      - "5178:80"
-      - "5179:443"
-    volumes:
-      - ../build/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ../build/nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ../assets:/app/assets
-    environment:
-      - NGINX_PORT=80
-      - TZ=Asia/Shanghai
+# nginx: 
+#   image: nginx:latest
+#   container_name: rj_starwiz_ai_django_nginx
+#   restart: always
+#   ports:
+#     - "5178:80"
+#     - "5179:443"
+#   volumes:
+#     - ../build/nginx/nginx.conf:/etc/nginx/nginx.conf
+#     - ../build/nginx/default.conf:/etc/nginx/conf.d/default.conf
+#     - ../assets:/app/assets
+#   environment:
+#     - NGINX_PORT=80
+#     - TZ=Asia/Shanghai
