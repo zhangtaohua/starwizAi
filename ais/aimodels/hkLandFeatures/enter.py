@@ -3,6 +3,7 @@ import pickle
 import sys
 import warnings
 from datetime import datetime
+from pathlib import Path
 from typing import AnyStr, Optional
 
 import cv2
@@ -20,7 +21,10 @@ from utils.geoCommon import get_bbox_from_geojson
 
 warnings.filterwarnings("ignore")
 
-model_path = "D:/Work/project/Python/starwizAi/ais/aimodels/hkLandFeatures/XR07.pickle"
+# model_path = "/app/ais/aimodels/hkLandFeatures/XR07.pickle"
+current_file_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(current_file_path)
+model_path = os.path.join(current_directory, "XR07.pickle")
 
 
 def read_tif(filepath):
@@ -35,6 +39,7 @@ def read_tif(filepath):
 def get_predict(defined_model, input_tif, output_png):
     try:
         # 读取tif数据基本信息
+        # print("开始 get_predict 目录", defined_model, input_tif, output_png)
         im_data = read_tif(input_tif)
         # 打开训练文件
         file = open(defined_model, "rb")

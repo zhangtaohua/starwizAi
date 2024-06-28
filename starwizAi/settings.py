@@ -35,6 +35,7 @@ if current_os == "Windows":
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+print("设置的 BaseDIR", BASE_DIR)
 
 
 # Quick-start development settings - unsuitable for production
@@ -198,8 +199,8 @@ Q_CLUSTER = {
 }
 
 # CUSTOM VAR
-DOWNLOAD_TIFF_URL = "http://192.168.3.247:5177/static/assets/ai/downloads/tiff/"
-AI_RESULTS_URL = "http://192.168.3.247:5177/static/assets/ai/results/"
+DOWNLOAD_TIFF_URL = "http://192.168.3.247:5178/static/assets/ai/downloads/tiff/"
+AI_RESULTS_URL = "http://192.168.3.247:5178/static/assets/ai/results/"
 
 DOWNLOAD_TIFF_PATH = BASE_DIR / "assets/ai/downloads/tiff/"
 AI_RESULTS_PATH = BASE_DIR / "assets/ai/results/"

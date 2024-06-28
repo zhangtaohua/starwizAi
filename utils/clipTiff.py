@@ -185,7 +185,7 @@ def clip_tiff_by_wrap(input_tiff, output_tiff, bbox):
     try:
         dirName, filename = os.path.split(output_tiff)
         if not os.path.exists(dirName):
-            os.makedirs(dirName, 777)
+            os.makedirs(dirName, 0o777)
 
         # Define the bounding box
         minX, minY, maxX, maxY = bbox
@@ -219,7 +219,7 @@ def clip_tiff_to_img_by_wrap(input_tiff, output_img, bbox):
     try:
         dirName, filename = os.path.split(output_img)
         if not os.path.exists(dirName):
-            os.makedirs(dirName, 777)
+            os.makedirs(dirName, 0o777)
 
         # Define the bounding box
         minX, minY, maxX, maxY = bbox
@@ -256,7 +256,7 @@ def clip_tiff_to_png_by_wrap(input_tiff, output_img, bbox):
     try:
         dirName, filename = os.path.split(output_img)
         if not os.path.exists(dirName):
-            os.makedirs(dirName, 777)
+            os.makedirs(dirName, 0o777)
 
         # Define the bounding box
         minX, minY, maxX, maxY = bbox

@@ -1,7 +1,7 @@
 import os
 
 
-def create_directory(file_path):
+def create_directory(file_path, permissions=0o777):
     """
     判断目录是否存在，如果不存在则创建目录，并创建一个空文件。
 
@@ -13,13 +13,13 @@ def create_directory(file_path):
     # 检查目录是否存在
     if not os.path.exists(dir_path):
         # 如果目录不存在，则创建目录
-        os.makedirs(dir_path, 777)
+        os.makedirs(dir_path, permissions)
         print(f"目录 {dir_path} 已创建")
     else:
         print(f"目录 {dir_path} 已存在")
 
 
-def create_directory_and_file(file_path):
+def create_directory_and_file(file_path, permissions=0o777):
     """
     判断目录是否存在，如果不存在则创建目录，并创建一个空文件。
 
@@ -31,7 +31,7 @@ def create_directory_and_file(file_path):
     # 检查目录是否存在
     if not os.path.exists(dir_path):
         # 如果目录不存在，则创建目录
-        os.makedirs(dir_path)
+        os.makedirs(dir_path, permissions)
         print(f"目录 {dir_path} 已创建")
     else:
         print(f"目录 {dir_path} 已存在")
