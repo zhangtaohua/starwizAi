@@ -20,14 +20,26 @@ ARG UID=10001
 RUN --mount=type=cache,target=/root/.cache/pip \
   --mount=type=bind,source=requirements.txt,target=requirements.txt \
   --mount=type=bind,source=build/wheels,target=/wheels \
+  --mount=type=bind,source=build/tools,target=/tools,rw=true \
   set -ex \
   && apt-get update \
-  && apt-get install -y supervisor \
+  && apt-get install -y --no-install-recommends supervisor software-properties-common build-essential gnupg2  \
+  && dpkg -i /tools/Debian_cuda1205/update-glx_1.2.2_amd64.deb \
+  && dpkg -i /tools/Debian_cuda1205/glx-diversions_1.2.2_amd64.deb \
+  && dpkg -i /tools/Debian_cuda1205/glx-alternative-mesa_1.2.2_amd64.deb \
+  && dpkg -i /tools/Debian_cuda1205/glx-alternative-nvidia_1.2.2_amd64.deb \
+  && dpkg -i /tools/Debian_cuda1205/cuda-repo-debian12-12-5-local_12.5.1-555.42.06-1_amd64.deb \
+  && cp /var/cuda-repo-debian12-12-5-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
+  && dpkg -i /tools/Debian_cuda1205/cudnn-local-repo-debian12-9.2.1_1.0-1_amd64.deb \
+  && cp /var/cudnn-local-repo-debian12-9.2.1/cudnn-*-keyring.gpg /usr/share/keyrings/ \
+  && add-apt-repository contrib \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends cuda-toolkit-12-5 cuda-drivers cudnn-cuda-12 \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /var/cache/apk/* \
-  && adduser --uid 10001 --disabled-password --gecos "" --home "/home/appuser" appuser \
-  &&  python -m pip install --no-cache-dir -r requirements.txt /wheels/GDAL-3.9.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  && python -m pip install --no-cache-dir -r requirements.txt /wheels/GDAL-3.9.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
+  && adduser --uid 10001 --disabled-password --gecos "" --home "/home/appuser" appuser
 
 COPY build/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY build/docker/supervisord.conf /app/build/docker/supervisord.conf
@@ -35,6 +47,10 @@ COPY build/docker/supervisord.conf /app/build/docker/supervisord.conf
 RUN set -ex \
   && chmod 777 /etc/supervisor \
   && chown -R appuser:appuser /app 
+
+# Set environment variables for CUDA
+ENV PATH /usr/local/cuda/bin:$PATH
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 # Switch to the non-privileged user to run the application.
 USER appuser

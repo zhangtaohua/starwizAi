@@ -13,7 +13,4 @@ gunicorn
 requests
 psycopg2-binary
 ultralytics
-torch
-torchvision
-torchaudio
 tensorflow

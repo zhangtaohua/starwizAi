@@ -6,7 +6,7 @@ from django_q.tasks import Task, async_task, result
 def task_finish(task: Task):
     print("任务完成", task)
     task_result = result(task.id)
-    print("task_result", task_result)
+    print("任务结果：", task_result)
 
 
 def task_start(inputParams):

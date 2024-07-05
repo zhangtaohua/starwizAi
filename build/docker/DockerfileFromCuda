@@ -1,0 +1,16 @@
+# base runtime devel
+ARG CUDA_TAG=devel
+ARG CUDA_VERSION=12.5.0
+# ubuntu22.04 ubuntu20.04
+ARG LINUX_TAG=ubuntu22.04
+
+FROM nvidia/cuda:${CUDA_VERSION}-${CUDA_TAG}-${LINUX_TAG} as base
+
+RUN apt-get update && apt-get install -y \
+  python3 \
+  python3-pip \
+  && pip3 install tensorflow-gpu
+
+
+
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/extras/CUPTI/lib64

@@ -82,11 +82,19 @@ https://girder.github.io/large_image_wheels/
 python3 manage.py migrate django_q
 python3 manage.py qcluster
 
+## cuDNN 
+https://developer.nvidia.com/rdp/cudnn-archive
+
+192.168.3.250:\softwares\CUDA 请别删
+
 ## 注意 
 1  、 scikit-learn  要用1.3.1 版本
 
 ## 清空间
 ```
+docker system df
+docker builder prune
+docker system prune -a
 wsl --shutdown
 ```
 
@@ -95,7 +103,7 @@ wsl --shutdown
 ```
  diskpart
 # 选择虚拟机文件执行瘦身
-> select vdisk file="C:\Users\13823\AppData\Local\Docker\wsl\data\ext4.vhdx"
+> select vdisk file="C:\Users\RJ\AppData\Local\Docker\wsl\data\ext4.vhdx"
 > attach vdisk readonly
 > compact vdisk
 > detach vdisk
@@ -128,3 +136,22 @@ proj_create_from_database: C:\Program Files\PostgreSQL\13\share\contrib\postgis-
 
 docker run -d --name test_starwiz_ai_django -v /d/Work/project/Python/starwizAi:/app -p 5177:5177  starwiz_ai_django:prod
 
+## docker 镜像
+{
+  "builder": {
+    "gc": {
+      "defaultKeepStorage": "20GB",
+      "enabled": true
+    }
+  },
+  "registry-mirrors": [
+    "https://registry.docker-cn.com",
+    "https://docker.mirrors.ustc.edu.cn",
+    "http://hub-mirror.c.163.com",
+    "https://mirror.sjtu.edu.cn"
+  ],
+  "experimental": false,
+  "features": {
+    "buildkit": true
+  }
+}

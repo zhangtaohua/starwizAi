@@ -1,0 +1,54 @@
+ARG TORCH_VERDION=2.3.1
+ARG CUDA_VERSION=cuda12.1
+ARG CUDNN_VERSION=cudnn8
+# base runtime devel
+ARG PUBLISH_VERSION=devel
+
+FROM pytorch/pytorch:${TORCH_VERDION}-${CUDA_VERSION}-${CUDNN_VERSION}-${PUBLISH_VERSION} as base
+
+ENV PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+ARG UID=10001
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,source=requirements.txt,target=requirements.txt \
+    --mount=type=bind,source=build/wheels,target=/wheels \
+    --mount=type=bind,source=build/tools,target=/tools,rw=true \
+    set -ex \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends\
+    supervisor \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/apk/* \
+    && python -m pip install --no-cache-dir -r requirements.txt /wheels/GDAL-3.9.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
+    && adduser --uid 10001 --disabled-password --gecos "" --home "/home/appuser" appuser
+
+COPY build/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY build/docker/supervisord.conf /app/build/docker/supervisord.conf
+
+RUN set -ex \
+    && chmod 777 /etc/supervisor \
+    && chown -R appuser:appuser /app 
+
+# Set environment variables for CUDA
+ENV PATH /usr/local/cuda/bin:$PATH
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+# Switch to the non-privileged user to run the application.
+USER appuser
+
+# Copy the source code into the container.
+# COPY . .
+
+# method 2 not debuged
+# COPY build/docker/start.sh /app/start.sh
+# RUN  chmod +x /app/start.sh 
+
+# Expose the port that the application listens on.
+EXPOSE 5177
+
+# Run the application.
+ENTRYPOINT ["/usr/bin/supervisord", "-n"]
