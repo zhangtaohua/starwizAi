@@ -85,7 +85,6 @@ python3 manage.py qcluster
 ## cuDNN 
 https://developer.nvidia.com/rdp/cudnn-archive
 
-192.168.3.250:\softwares\CUDA 请别删
 
 ## 注意 
 1  、 scikit-learn  要用1.3.1 版本
@@ -155,3 +154,17 @@ docker run -d --name test_starwiz_ai_django -v /d/Work/project/Python/starwizAi:
     "buildkit": true
   }
 }
+
+supervisorctl shutdown
+supervisorctl reload
+supervisorctl start all
+supervisorctl stop all
+supervisorctl status
+
+docker run -d --name rj_ai_torch --gpus all -it -v /home/hkatg/app/starwizAi:/app/ -v /mnt/nas246/public/DataWiz/ais/assets/:/app/assets/ -p 55177:5177  pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime /bin/bash
+
+docker run -d --name rj_ai_torch --gpus all -it -v /home/hkatg/app/starwizAi:/app/ -v /mnt/nas246/public/DataWiz/ais/assets/:/app/assets/ -p 55177:5177  starwiz_ai_django:c_1.1 /bin/bash
+
+/home/hkatg/app/ghk-data-api/script/ml/f242dda5-ad67-4642-b216-0a38ee47d085
+
+/mnt/nas246/public/DataWiz/ais/assets/ai/results/rj_test_user_id/2024-07-10/1c9fb2fa-7e07-4145-a52c-5f8fdfba4b5e

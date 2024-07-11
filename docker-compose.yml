@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  app:
+    image: starwiz_ai_django:c_1.1
+    container_name: rj_ai_torch
+    restart: always
+    network_mode: bridge
+    volumes:
+      - "/home/hkatg/app/starwizAi/:/app/"
+      - "/mnt/nas246/public/DataWiz/ais/assets/:/app/assets/"
+    ports:
+      - "55177:5177"
+    deploy:
+      resources:
+        #limits:
+        # 具体分配看宿主机配置
+        # cpus: "8.00"
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cd /app && python3 manage.py runserver 0.0.0.0:5177

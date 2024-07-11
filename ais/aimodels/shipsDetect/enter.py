@@ -1,6 +1,7 @@
 import os
 import pickle
 import sys
+import traceback
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -9,14 +10,16 @@ from typing import AnyStr, Optional
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from django.conf import settings
 from django_q.tasks import Task, async_task, result
 from osgeo import gdal
 from ultralytics import YOLO
+from yolov5.detect import run
 
 from ais.models import AiProjectResultStatus, Download, DownloadStatus
 from ais.models_utils import updata_ai_project_result_results, updata_ai_project_result_status
-from utils.clipTiff import clip_tiff_by_band, clip_tiff_by_trans, clip_tiff_by_wrap
+from utils.clipTiff import clip_tiff_by_band, clip_tiff_by_trans, clip_tiff_by_wrap, clip_tiff_to_img_by_wrap
 from utils.download import download_file, verify_file
 from utils.fileCommon import create_directory
 from utils.geoCommon import get_bbox_from_geojson
@@ -26,7 +29,11 @@ warnings.filterwarnings("ignore")
 # model_path = "/app/ais/aimodels/hkLandFeatures/XR07.pickle"
 current_file_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_file_path)
-model_path = os.path.join(current_directory, "/weights/ships.pt")
+ship_model_path = os.path.join(current_directory, "weights/ships.pt")
+airplane_model_path = os.path.join(current_directory, "weights/airplane.pt")
+
+ship_test_input_tiff = os.path.join(current_directory, "tiff/ship.jpg")
+airplane_test_input_tiff = os.path.join(current_directory, "tiff/airplane.jpg")
 
 
 def get_single_gray_img(filepath, outpath):
@@ -44,29 +51,43 @@ def get_single_gray_img(filepath, outpath):
         return False
 
 
-def get_predict(defined_model, input_png, output_dir):
+def get_predict(defined_model, input_png, output_dir, ai_model_code="ShipsDetect"):
     try:
-        model = YOLO(defined_model)
-        results = model(input_png)
-        # run(
-        #     weights=defined_model,
-        #     save_txt=True,
-        #     save_crop=True,
-        #     save_conf=True,
-        #     source=input_png,
-        #     device="gpu",
-        #     hide_labels=True,
-        #     project=output_dir,
-        #     name="handle",
-        # )
-        print("get_predict", results)
+        # print("加载船只模型", defined_model)
+        # model = YOLO(defined_model)
+        # print("船只模型", model)
+        # results = model(input_png)
+        # print("get_predict", results)
+        target_device = "cpu"
+        if torch.cuda.is_available():
+            target_device = "gpu"
+
+        print("使用 device", target_device)
+        input_souce = ship_test_input_tiff
+        defined_model = ship_model_path
+
+        if ai_model_code == "AirplanesDetect":
+            input_souce = airplane_test_input_tiff
+            defined_model = airplane_model_path
+
+        run(
+            weights=defined_model,
+            save_txt=True,
+            save_crop=True,
+            save_conf=True,
+            source=input_souce,
+            device=target_device,
+            hide_labels=True,
+            project=output_dir,
+            name="detectResults",
+        )
         return True
     except FileNotFoundError as e:
-        print(e.with_traceback())
         print(f"Error: File not found.{e}")
         return False
     except Exception as e:
-        print(e.with_traceback())
+        # print(e.with_traceback(traceback.extract_stack()))
+        print(e.with_traceback(None))
         return False
 
 
@@ -125,6 +146,7 @@ def task_start(input_params):
     meta_data = input_params.get("meta")
     result_uuid = meta_data.get("uuid")
     user_id = meta_data.get("user_id")
+    ai_model_code = meta_data.get("ai_model_code")
 
     updata_ai_project_result_status(result_uuid, AiProjectResultStatus.IDLE.value, 1)
 
@@ -141,6 +163,7 @@ def task_start(input_params):
 
     input_file_name = ""
     output_tiff = ""
+    output_jpg = ""
     output_bbox = None
     area = ""
     output_result_dir = ""
@@ -172,9 +195,12 @@ def task_start(input_params):
                 output_tiff = os.path.join(
                     settings.AI_RESULTS_PATH, user_id, time_dir, str(result_uuid), hand_tiff_name
                 )
+                output_jpg = os.path.join(settings.AI_RESULTS_PATH, user_id, time_dir, str(result_uuid), "handle.jpg")
                 create_directory(output_tiff)
                 clip_tiff_by_trans(input_file_name, output_tiff, output_bbox, origin_bbox)
                 # clip_tiff_by_band(input_file_name, output_tiff, output_bbox, origin_bbox)
+
+                clip_tiff_to_img_by_wrap(input_file_name, output_jpg, output_bbox)
     else:
         # 有问题 记录日志 文件无法下载等
         print("File is not exist, AI cannot handle")
@@ -190,7 +216,13 @@ def task_start(input_params):
     for _ in range(try_ai_count):
         if area == "area" and output_tiff:
             updata_ai_project_result_status(result_uuid, AiProjectResultStatus.AI_PROCESSING.value, 20)
-            output_png_file_name = "result.png"
+            output_png_file_name = "detectResults/ship.jpg"
+            if ai_model_code == "AirplanesDetect":
+                output_png_file_name = "detectResults/airplane.jpg"
+
+            # output_png_url = os.path.join(
+            #     settings.AI_RESULTS_URL, user_id, time_dir, str(result_uuid), output_png_file_name
+            # )
             output_png_url = os.path.join(
                 settings.AI_RESULTS_URL, user_id, time_dir, str(result_uuid), output_png_file_name
             )
@@ -201,7 +233,7 @@ def task_start(input_params):
             try:
                 is_single = get_single_gray_img(output_tiff, output_single_gray_name)
                 if is_single:
-                    ai_result = get_predict(model_path, output_single_gray_name, output_result_dir)
+                    ai_result = get_predict(ship_model_path, output_jpg, output_result_dir, ai_model_code)
                     if ai_result:
                         save_res = {
                             "base_dir_url": settings.PRODUCT_ASSETS_BASE_DIR,

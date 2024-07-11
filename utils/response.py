@@ -25,3 +25,7 @@ def json_response_with_data(data, msg="操作成功"):
         json_dumps_params={"ensure_ascii": False},
         safe=False,
     )
+
+
+def response_success():
+    return HttpResponse("ok")

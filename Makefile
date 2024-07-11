@@ -11,16 +11,23 @@ build:
 	docker build -t ${IMAGE_NAME}:${VERSION_TAG} -f ./build/docker/Dockerfile .
 	docker save -o ./build/images/${IMAGE_NAME}.tar.gz ${IMAGE_NAME}:${VERSION_TAG}
 
-build_prox:
+build_proxy:
 	docker build \
 	--build-arg HTTP_PROXY=http://192.168.3.118:7890 \
   --build-arg HTTPS_PROXY=https://192.168.3.118:7890 \
-	-t ${IMAGE_NAME}:${VERSION_TAG} -f ./build/docker/Dockerfile .
-	docker save -o ./build/images/${IMAGE_NAME}.tar.gz ${IMAGE_NAME}:${VERSION_TAG}
+	-t ${IMAGE_NAME}:${VERSION_TAG} -f ./build/docker/DockerfileFromCuda .
+	docker save -o ./build/images/${IMAGE_NAME}.tar.gz ${IMAGE_NAME}:cuda_${VERSION_TAG}
+
+build_cuda:
+	docker build -t ${IMAGE_NAME}:cuda_${VERSION_TAG} -f ./build/docker/DockerfileFromCuda .
+	docker save -o ./build/images/${IMAGE_NAME}_cuda.tar.gz ${IMAGE_NAME}:cuda_${VERSION_TAG}
+
+build_torch:
+	docker build -t ${IMAGE_NAME}:torch_${VERSION_TAG} -f ./build/docker/DockerfileFromPytorch .
+	docker save -o ./build/images/${IMAGE_NAME}_torch.tar.gz ${IMAGE_NAME}:torch_${VERSION_TAG}
 
 test:
-	docker run -d --name ${TEST_CONTAINER_NAME} -v /d/Work/project/Python/starwizAi:/app	-p 5177:5177  ${IMAGE_NAME}:${VERSION_TAG}
-
+	docker run -d --name ${TEST_CONTAINER_NAME} -v /d/Work/project/Python/starwizAi:/app	-p 5177:5177  ${IMAGE_NAME}:${VERSION_
 test1:
 	docker run -d --name ${TEST_CONTAINER_NAME} -v /d/Work/Golang/run/django/.env:/app/.env \
 	-v /d/Work/Golang/run/django/starwizAi/settings.py:/app/starwizAi/settings.py \
@@ -30,7 +37,7 @@ test1:
 test2:
 	docker run -d --name ${TEST_CONTAINER_NAME}_qcluster -v /d/Work/Golang/run/django/.env:/app/.env \
 	-v /d/Work/Golang/run/django/starwizAi/settings.py:/app/starwizAi/settings.py \
-	-p 5177:5177	-p 5177:5177  ${IMAGE_NAME}:${VERSION_TAG} -i gunicorn --bind 0.0.0.0:5177 starwizAi.wsgi:application  
+	-p 5177:5177  ${IMAGE_NAME}:${VERSION_TAG} -i gunicorn --bind 0.0.0.0:5177 starwizAi.wsgi:application  
 
 clean_test:
 	docker stop ${TEST_CONTAINER_NAME}
@@ -41,6 +48,4 @@ clean_docker_cache:
 	docker builder prune
 
 # docker container prune
-# docker image prune
-
-clean:clean_test clean_docker_cache\
+# docker imagclean:clean_test clean_docker_cache

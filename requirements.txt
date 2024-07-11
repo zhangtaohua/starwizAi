@@ -12,8 +12,9 @@ pyproj
 gunicorn
 requests
 psycopg2-binary
-ultralytics
 torch
 torchvision
 torchaudio
 tensorflow
+ultralytics
+yolov5
