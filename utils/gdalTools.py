@@ -1,27 +1,32 @@
-import getopt
 import os
-import sys
 
 import numpy as np
 from osgeo import gdal, ogr, osr
 
+from .fileCommon import delete_and_rename_file
+
+
+def gdal_read_tiff(filepath):
+    dataset = gdal.Open(filepath)
+    if dataset is None:
+        print("Error: Unable to open the input TIFF file.")
+        return None
+    return dataset
+
+
+def gdal_read_tif_to_array(filepath):
+    dataset = gdal.Open(filepath)
+    if dataset is None:
+        print("Error: Unable to open the input TIFF file.")
+        return None
+    im_data = dataset.ReadAsArray(0, 0, dataset.RasterXSize, dataset.RasterYSize)
+    return im_data
+
 
 # 没有测试
-def delete_and_rename(input_file, output_file):
-    # 删除输入文件
-    try:
-        os.remove(input_file)
-        print(f"{input_file} 删除成功.")
-        os.rename(output_file, input_file)
-        print(f"{output_file} 重命名为 {input_file} 成功.")
-    except OSError as e:
-        print(f"Error: {input_file} 删除或者重命名失败. {e}")
-
-
-# 没有测试
-def tiff_16Byte_to_8Byte(input):
+def gdal_tiff_16Byte_to_8Byte(input):
     # 读取tiff数据
-    ds = gdal.Open(input)
+    ds = gdal_read_tiff(input)
     assert ds
 
     info = gdal.Info(ds, format="json")
@@ -67,7 +72,7 @@ def tiff_16Byte_to_8Byte(input):
             print(cmd)
             os.system(cmd)
             ds = None
-            delete_and_rename(input, output)
+            delete_and_rename_file(input, output)
 
         else:
             flags = 1
@@ -89,7 +94,7 @@ def tiff_16Byte_to_8Byte(input):
             print(cmd_scale)
             os.system(cmd_scale)
 
-            delete_and_rename(input, output)
+            delete_and_rename_file(input, output)
 
 
 # 没有测试
@@ -117,7 +122,7 @@ def png_to_tiff(source, bbox):
 def tiff_to_png(source, out):
     try:
         # tmp = "tmp/" + str(uuid.UUID) + ".tif"
-        tif_16Byte_to_8Byte(source)
+        gdal_tiff_16Byte_to_8Byte(source)
         # ds = gdal.Warp(tmp, source,
         #                options=gdal.WarpOptions(dstSRS="EPSG:4326", format="GTiff", outputType=gdal.GDT_Byte))
         ds = gdal.Open(source)

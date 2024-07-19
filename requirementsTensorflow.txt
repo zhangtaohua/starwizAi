@@ -1,5 +1,4 @@
 async-timeout
-numpy
 python-dotenv
 opencv-python-headless
 matplotlib
@@ -11,12 +10,7 @@ scipy==1.13.1
 redis
 pyproj
 gunicorn
-requests
 psycopg2-binary
-torch
-torchvision
-torchaudio
 tqdm
-tensorflow
 ultralytics
 yolov5

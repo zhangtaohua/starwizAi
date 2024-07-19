@@ -1,79 +1,135 @@
 import os
-import pickle
-import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import AnyStr, Optional
 
-import cv2
+import matplotlib.pyplot as plt
 import numpy as np
+import torch
+import torch.nn.functional as F
 from django.conf import settings
 from django_q.tasks import Task, async_task, result
 from osgeo import gdal
+from PIL import Image
+from torchvision import transforms
 
 from ais.models import AiProjectResultStatus
 from ais.models_utils import updata_ai_project_result_results, updata_ai_project_result_status
 from ais.utils.ai_tools import check_and_download_file
-from utils.clipTiff import clip_tiff_by_band, clip_tiff_by_trans, clip_tiff_by_wrap
+from utils.clipTiff import clip_tiff_by_band, clip_tiff_by_trans, clip_tiff_by_wrap, clip_tiff_to_img_by_wrap
 from utils.fileCommon import create_directory
 from utils.geoCommon import get_bbox_from_geojson
 
+from .unet import UNet
+
 warnings.filterwarnings("ignore")
 
-# model_path = "/app/ais/aimodels/hkLandFeatures/XR07.pickle"
 current_file_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_file_path)
-model_path = os.path.join(current_directory, "XR07.pickle")
+model_path = os.path.join(current_directory, "weights/CP_epoch30.pth")
+
+test_input_tiff = os.path.join(current_directory, "test/sat.jpg")
 
 
-def read_tif(filepath):
-    dataset = gdal.Open(filepath)
-    if dataset is None:
-        print("Error: Unable to open the input TIFF file.")
-        sys.exit(1)
-    im_data = dataset.ReadAsArray(0, 0, dataset.RasterXSize, dataset.RasterYSize)
-    return im_data
+def preprocess_image(pil_img, scale):
+    w, h = pil_img.size
+    newW, newH = int(scale * w), int(scale * h)
+    assert newW > 0 and newH > 0, "Scale is too small"
+    pil_img = pil_img.resize((newW, newH))
+
+    img_nd = np.array(pil_img)
+
+    if len(img_nd.shape) == 2:
+        img_nd = np.expand_dims(img_nd, axis=2)
+
+    # HWC to CHW
+    img_trans = img_nd.transpose((2, 0, 1))
+    if img_trans.max() > 1:
+        img_trans = img_trans / 255
+    return img_trans
 
 
-def get_predict(defined_model, input_tif, output_png):
+def predict_img(net, full_img, device, scale_factor=1, out_threshold=0.5):
+    net.eval()
+
+    img = torch.from_numpy(preprocess_image(full_img, scale_factor))
+
+    img = img.unsqueeze(0)
+    img = img.to(device=device, dtype=torch.float32)
+
+    with torch.no_grad():
+        output = net(img)
+        # print(output)
+        if net.n_classes > 1:
+            probs = F.softmax(output, dim=1)
+        else:
+            probs = torch.sigmoid(output)
+
+        probs = probs.squeeze(0)
+
+        height, width = probs.shape[1], probs.shape[2]
+
+        ## convert probabilities to class index and then to RGB
+        ###################################################
+        mapping = {
+            0: (0, 255, 255),  # urban_land
+            1: (255, 255, 0),  # agriculture
+            2: (255, 0, 255),  # rangeland
+            3: (0, 255, 0),  # forest_land
+            4: (0, 0, 255),  # water
+            5: (255, 255, 255),  # barren_land
+            6: (0, 0, 0),
+        }  # unknown
+        class_idx = torch.argmax(probs, dim=0)
+        image = torch.zeros(height, width, 3, dtype=torch.uint8)
+
+        for k in mapping:
+
+            idx = class_idx == torch.tensor(k, dtype=torch.uint8)
+            validx = idx == 1
+            image[validx, :] = torch.tensor(mapping[k], dtype=torch.uint8)
+
+        image = image.permute(2, 0, 1)
+
+        tf = transforms.Compose([transforms.ToPILImage(), transforms.Resize(full_img.size[1]), transforms.ToTensor()])
+
+        image = image.permute(1, 2, 0)
+        image = image.squeeze().cpu().numpy()
+
+    return image, class_idx
+
+
+def get_predict(defined_model, input_png, output_name):
     try:
-        # 读取tif数据基本信息
-        # print("开始 get_predict 目录", defined_model, input_tif, output_png)
-        im_data = read_tif(input_tif)
-        # 打开训练文件
-        file = open(defined_model, "rb")
-        rf_model = pickle.load(file)
-        file.close()
-        print("图片信息", im_data, rf_model)
+        net = UNet(n_channels=3, n_classes=7)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("加载Land模型 和GPU", defined_model, device)
 
-        data = np.zeros((im_data.shape[0], im_data.shape[1] * im_data.shape[2]))
-        for i in range(im_data.shape[0]):
-            data[i] = im_data[i].flatten()
-        data = data.swapaxes(0, 1)
+        net.to(device=device)
+        net.load_state_dict(torch.load(defined_model, map_location=device))
 
-        # 进行分类预测
-        pred = rf_model.predict(data)
-        pred = pred.reshape(im_data.shape[1], im_data.shape[2]) * 255
-        pred = pred.astype(np.uint8)
+        img = Image.open(input_png)
 
-        # 对图像进行滤波去噪点和颜色赋值
-        kernel = np.ones((2, 2), np.uint8)
-        temp = cv2.medianBlur(pred, 9)  # 中值滤波
-        original_color = np.array([255, 255, 255])  # 原始颜色为白色
-        replacement_color = np.array([0, 200, 100])
-        image_rgb = cv2.cvtColor(temp, cv2.COLOR_GRAY2RGB)
-        mask = np.all(image_rgb == original_color, axis=-1)
-        image_rgb[mask] = replacement_color
-        image_rgb[~mask] = [255, 255, 255]
-        cv2.imwrite(output_png, image_rgb)
+        # Splitting input directory from the file name
+        name = input_png.split("/")[-1]
+        # Removing the file extension
+        name = name.split(".")[0]
+        seg, mask_indices = predict_img(net=net, full_img=img, scale_factor=0.2, out_threshold=0.5, device=device)
+
+        im = Image.fromarray(seg)
+        im.save(output_name)
+        print("Land模型 结果", mask_indices)
+        torch.cuda.empty_cache()
         return True
     except FileNotFoundError as e:
-        print(e.with_traceback())
+        torch.cuda.empty_cache()
         print(f"Error: File not found.{e}")
         return False
     except Exception as e:
-        print(e.with_traceback())
+        # print(e.with_traceback(traceback.extract_stack()))
+        print(e.with_traceback(None))
+        torch.cuda.empty_cache()
         return False
 
 
@@ -157,7 +213,7 @@ def task_start(input_params):
                 # clip_tiff_by_band(target_dw_inputfile_path_name, output_tiff, output_bbox, target_origin_bbox)
 
                 # 剪裁成 png jpg
-                # clip_tiff_to_img_by_wrap(target_dw_inputfile_path_name, output_jpg, output_bbox)
+                clip_tiff_to_img_by_wrap(target_dw_inputfile_path_name, output_jpg, output_bbox)
             else:
                 print("Error: Extent not found when processing")
                 updata_ai_project_result_status(
@@ -191,7 +247,7 @@ def task_start(input_params):
 
             ai_result = False
             try:
-                ai_result = get_predict(model_path, output_tiff, output_result_file_name)
+                ai_result = get_predict(model_path, test_input_tiff, output_result_file_name)
                 if ai_result:
                     save_res = {
                         "base_dir_url": settings.PRODUCT_ASSETS_BASE_DIR,
@@ -224,7 +280,7 @@ def task_start(input_params):
 
 def StartProcess(input_params):
     # 1 较验项目参数是否正确
-    print("随机树分类任务开始处理：\r\n")
+    print("船只识别任务开始处理：\r\n")
     # 2 开启异步任务处理
     async_task(task_start, input_params, q_options={"task_name": input_params.get("uuid"), "hook": task_finish})
 

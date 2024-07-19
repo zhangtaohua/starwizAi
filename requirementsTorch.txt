@@ -1,3 +1,4 @@
+async-timeout
 python-dotenv
 opencv-python-headless
 matplotlib
@@ -10,6 +11,7 @@ redis
 pyproj
 gunicorn
 psycopg2-binary
-tensorflow==2.13
+tensorflow=2.14.0
+tqdm
 ultralytics
 yolov5

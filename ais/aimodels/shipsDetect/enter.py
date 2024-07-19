@@ -17,10 +17,10 @@ from osgeo import gdal
 from ultralytics import YOLO
 from yolov5.detect import run
 
-from ais.models import AiProjectResultStatus, Download, DownloadStatus
+from ais.models import AiProjectResultStatus
 from ais.models_utils import updata_ai_project_result_results, updata_ai_project_result_status
+from ais.utils.ai_tools import check_and_download_file
 from utils.clipTiff import clip_tiff_by_band, clip_tiff_by_trans, clip_tiff_by_wrap, clip_tiff_to_img_by_wrap
-from utils.download import download_file, verify_file
 from utils.fileCommon import create_directory
 from utils.geoCommon import get_bbox_from_geojson
 
@@ -91,48 +91,6 @@ def get_predict(defined_model, input_png, output_dir, ai_model_code="ShipsDetect
         return False
 
 
-def check_and_download_file(file_url: AnyStr):
-    # 有可能要执行下面语句才可以拿到 settings 中变量
-    #  django.setup()
-
-    # 1 获取数据库 下载表，如果已下载且完整直接返回
-    print("检查文件", file_url)
-    file_path = settings.DOWNLOAD_TIFF_PATH
-    file_name = file_url.strip("/").rsplit("/", 1)[-1]
-    whole_file_name = os.path.join(file_path, file_name)
-
-    try:
-        file_obj = Download.objects.using("postgres").get(name=file_name)
-        # 文件已下载直接返回
-        if file_obj.status == DownloadStatus.DOWNLOAD_SUCCESS.value:
-            return file_obj.asset_path
-
-    except Download.DoesNotExist:
-        print(f"{file_name} 文件未下载")
-
-    # 文件不存在 开始下载
-    try_downloads_count = int(settings.MAX_TRY_DOWNLOADS_TIMES)
-    all_down_file = None
-    for _ in range(try_downloads_count):
-        all_down_file = download_file(file_url, whole_file_name)
-        if all_down_file:
-            break
-
-    if all_down_file:
-        downlaod_obj = Download.objects.using("postgres").create(
-            name=file_name,
-            asset_path=whole_file_name,
-            md5="",
-            status=DownloadStatus.DOWNLOAD_SUCCESS.value,
-            # created_at=datetime.utcnow(),
-            # updated_at=datetime.utcnow(),
-        )
-        downlaod_obj.save(using="postgres")
-        return whole_file_name
-    else:
-        return None
-
-
 def task_finish(task: Task):
     print("任务完成", task)
     task_result = result(task.id)
@@ -142,90 +100,109 @@ def task_finish(task: Task):
 
 def task_start(input_params):
     print("任务开始处理：", input_params, type(input_params), "\r\n")
-    # 1 确认输入文件是否存在，不存在则下载
+    # 1 参数准备处理
     meta_data = input_params.get("meta")
     result_uuid = meta_data.get("uuid")
     user_id = meta_data.get("user_id")
     ai_model_code = meta_data.get("ai_model_code")
+    area = input_params.get("area")
 
+    # 用于生成随时间的AI分析结果存储目录。
+    now = datetime.now()
+    time_dir = now.strftime("%Y-%m-%d")
+
+    # 更新 数据库 AI 处理结果进度
     updata_ai_project_result_status(result_uuid, AiProjectResultStatus.IDLE.value, 1)
 
     origin_data = input_params.get("data")
     if origin_data:
         origin_data = origin_data.get("data")
 
-    tiff_url = None
-    origin_bbox = None
+    # 要下载处理的 tiff 目标的 远程Url地址。
+    target_tiff_url = None
+    # 要下载处理的 tiff 目标的 原始bbox。
+    target_origin_bbox = None
     if origin_data:
-        tiff_url = origin_data.get("assets")
-        tiff_url = tiff_url.get("tiff").get("href")
-        origin_bbox = origin_data.get("bbox")
+        target_tiff_url = origin_data.get("assets")
+        target_tiff_url = target_tiff_url.get("tiff").get("href")
+        target_origin_bbox = origin_data.get("bbox")
 
-    input_file_name = ""
+    # 下载的tiff 文件路径和名称
+    target_dw_inputfile_path_name = ""
+
+    # 进入AI 处理过程得到的 中间结果 tiff 和 jpg 等
     output_tiff = ""
     output_jpg = ""
     output_bbox = None
-    area = ""
-    output_result_dir = ""
-    tiff_file_name = tiff_url.strip("/").rsplit("/", 1)[-1]
-    input_origin_tiff_url = os.path.join(settings.DOWNLOAD_TIFF_URL, tiff_file_name)
-    input_process_tiff_url = ""
+    # AI 输出结果目录
+    output_result_dir = os.path.join(settings.AI_RESULTS_PATH, user_id, time_dir, str(result_uuid))
+    # AI 输出结果返回给前端的目录
+    output_result_url = os.path.join(settings.AI_RESULTS_URL, user_id, time_dir, str(result_uuid))
+
+    # 当为area 处理时，裁剪的tiff url
+    output_process_tiff_url = ""
     output_png_url = ""
 
-    if tiff_url:
-        input_file_name = check_and_download_file(tiff_url)
+    # 2 确认输入文件是否存在，不存在则下载
+    if target_tiff_url:
+        target_dw_inputfile_path_name = check_and_download_file(target_tiff_url)
 
-    # 2 处理模型需要参数
-    if input_file_name:
+    # 3 处理模型需要参数
+    # 如果文件下载成功，就继续处理
+    if target_dw_inputfile_path_name:
         updata_ai_project_result_status(result_uuid, AiProjectResultStatus.FILE_DOWNLOAD_SUCCESS.value, 10)
 
-        area = input_params.get("area")
         if area == "area":  # 处理部分范围
             extent = input_params.get("extent")
             if extent:
                 output_bbox = get_bbox_from_geojson(extent)
-                print("bbox: ", output_bbox)
-                now = datetime.now()
-                time_dir = now.strftime("%Y-%m-%d")
-                output_result_dir = os.path.join(settings.AI_RESULTS_PATH, user_id, time_dir, str(result_uuid))
-                hand_tiff_name = "handle.tif"
-                input_process_tiff_url = os.path.join(
-                    settings.AI_RESULTS_URL, user_id, time_dir, str(result_uuid), hand_tiff_name
-                )
-                output_tiff = os.path.join(
-                    settings.AI_RESULTS_PATH, user_id, time_dir, str(result_uuid), hand_tiff_name
-                )
-                output_jpg = os.path.join(settings.AI_RESULTS_PATH, user_id, time_dir, str(result_uuid), "handle.jpg")
-                create_directory(output_tiff)
-                clip_tiff_by_trans(input_file_name, output_tiff, output_bbox, origin_bbox)
-                # clip_tiff_by_band(input_file_name, output_tiff, output_bbox, origin_bbox)
+                print("output_bbox: ", output_bbox)
 
-                clip_tiff_to_img_by_wrap(input_file_name, output_jpg, output_bbox)
+                hand_tiff_name = "handle.tif"
+
+                output_process_tiff_url = os.path.join(output_result_url, hand_tiff_name)
+                output_tiff = os.path.join(output_result_dir, hand_tiff_name)
+                output_jpg = os.path.join(output_result_dir, "handle.jpg")
+
+                # 创建存储目录
+                create_directory(output_tiff)
+                # 裁剪tiff
+                clip_tiff_by_trans(target_dw_inputfile_path_name, output_tiff, output_bbox, target_origin_bbox)
+                # clip_tiff_by_band(target_dw_inputfile_path_name, output_tiff, output_bbox, target_origin_bbox)
+
+                # 剪裁成 png jpg
+                clip_tiff_to_img_by_wrap(target_dw_inputfile_path_name, output_jpg, output_bbox)
+            else:
+                print("Error: Extent not found when processing")
+                updata_ai_project_result_status(
+                    result_uuid,
+                    AiProjectResultStatus.FILE_PROCESS_FAILED.value,
+                    100,
+                    "Extent not found when processing",
+                )
+        elif area == "whole":
+            print("whole process second stage")
     else:
-        # 有问题 记录日志 文件无法下载等
-        print("File is not exist, AI cannot handle")
+        # 文件下载失败有问题 记录日志
+        print("Error: File is not exist, AI cannot goon handling")
         output_tiff = ""
         output_bbox = None
         updata_ai_project_result_status(
-            result_uuid, AiProjectResultStatus.FILE_DOWNLOAD_FAILED.value, 100, "文件下载失败"
+            result_uuid, AiProjectResultStatus.FILE_DOWNLOAD_FAILED.value, 100, "Download file failed!"
         )
         return None
 
-    # 3 开启新的进程进行后台处理
+    # 4 开启新的进程进行后台处理
     try_ai_count = int(settings.MAX_TRY_AI_PROCESS_TIMES)
     for _ in range(try_ai_count):
         if area == "area" and output_tiff:
+            # 更新处理进度
             updata_ai_project_result_status(result_uuid, AiProjectResultStatus.AI_PROCESSING.value, 20)
             output_png_file_name = "detectResults/ship.jpg"
             if ai_model_code == "AirplanesDetect":
                 output_png_file_name = "detectResults/airplane.jpg"
 
-            # output_png_url = os.path.join(
-            #     settings.AI_RESULTS_URL, user_id, time_dir, str(result_uuid), output_png_file_name
-            # )
-            output_png_url = os.path.join(
-                settings.AI_RESULTS_URL, user_id, time_dir, str(result_uuid), output_png_file_name
-            )
+            output_png_url = os.path.join(output_result_url, output_png_file_name)
 
             output_result_file_name = os.path.join(output_result_dir, output_png_file_name)
             output_single_gray_name = os.path.join(output_result_dir, "single_gray.png")
@@ -237,8 +214,8 @@ def task_start(input_params):
                     if ai_result:
                         save_res = {
                             "base_dir_url": settings.PRODUCT_ASSETS_BASE_DIR,
-                            "input_origin_tiff": input_origin_tiff_url,
-                            "input_process_tiff": input_process_tiff_url,
+                            "input_origin_tiff": target_dw_inputfile_path_name,
+                            "input_process_tiff": output_process_tiff_url,
                             "output_png": output_png_url,
                             "area": area,
                             "output_bbox": output_bbox,
@@ -259,7 +236,7 @@ def task_start(input_params):
                 break
 
         elif area == "whole":
-            print("whole 处理")
+            print("whole process third stage")
             break
             # 4 处理结果 并 返回
             # updata_ai_project_result_status(result_uuid, AiProjectResultStatus.AI_PROCESS_DONE.value, 100)

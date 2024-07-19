@@ -163,6 +163,8 @@ supervisorctl status
 
 docker run -d --name rj_ai_torch --gpus all -it -v /home/hkatg/app/starwizAi:/app/ -v /mnt/nas246/public/DataWiz/ais/assets/:/app/assets/ -p 55177:5177  pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime /bin/bash
 
+docker run -d --name rj_ai_tf --gpus all -it -v /home/hkatg/app/starwizAi:/app/ -v /mnt/nas246/public/DataWiz/ais/assets/:/app/assets/ -p 55178:5177  tensorflow/tensorflow:2.14.0-gpu-jupyter  /bin/bash
+
 docker run -d --name rj_ai_torch --gpus all -it -v /home/hkatg/app/starwizAi:/app/ -v /mnt/nas246/public/DataWiz/ais/assets/:/app/assets/ -p 55177:5177  starwiz_ai_django:c_1.1 /bin/bash
 
 /home/hkatg/app/ghk-data-api/script/ml/f242dda5-ad67-4642-b216-0a38ee47d085

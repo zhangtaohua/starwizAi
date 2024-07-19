@@ -1,0 +1,51 @@
+# 说明其内部版本
+# python 3.11 
+# ubuntu 22.04
+# CUDA_VERSION=11.8.0
+
+# torch 单独安装 
+# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+ARG TENSORFLOW_VERSION=2.14.0
+
+FROM tensorflow/tensorflow:${TENSORFLOW_VERSION}-gpu-jupyter
+
+ENV TZ=Asia/Shanghai
+
+WORKDIR /app
+
+# Set up timezone
+# install
+RUN --mount=type=bind,source=requirementsTensorflow.txt,target=requirements.txt \
+  --mount=type=bind,source=build/wheels,target=/wheels \
+  ln -fs /usr/share/zoneinfo/Asia/Hong_Kong /etc/localtime && echo 'Asia/Shanghai' > /etc/time  \
+  && set -ex \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends libgl1 libgl1-mesa-glx libglib2.0-0 ca-certificates supervisor  \
+  && pip install --upgrade pip \
+  && pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 \
+  && pip install -r requirements.txt \
+  && pip install /wheels/GDAL-3.9.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
+  && adduser --uid 10001 --disabled-password --gecos "" --home "/home/appuser" appuser \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*  /tmp/* /var/tmp/* \
+  && rm -rf /var/cache/apk/*
+
+COPY build/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY build/docker/supervisord.conf /app/build/docker/supervisord.conf
+
+RUN set -ex \
+  && chmod 777 /etc/supervisor \
+  && chown -R appuser:appuser /app 
+
+# Switch to the non-privileged user to run the application.
+USER appuser
+
+# Expose the port that the application listens on.
+EXPOSE 5177
+
+HEALTHCHECK CMD curl -fs http://localhost:5177/ais/api/v1/health || exit 1
+
+# Run the application.
+ENTRYPOINT ["/usr/bin/supervisord", "-n"]
+
+# runtime 17 GB

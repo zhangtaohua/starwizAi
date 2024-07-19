@@ -1,8 +1,8 @@
 ARG TORCH_VERDION=2.3.1
-ARG CUDA_VERSION=cuda12.1
+ARG CUDA_VERSION=cuda11.8
 ARG CUDNN_VERSION=cudnn8
 # base runtime devel
-ARG PUBLISH_VERSION=devel
+ARG PUBLISH_VERSION=runtime
 ARG PYTHON_VERSION=python3.10
 
 FROM pytorch/pytorch:${TORCH_VERDION}-${CUDA_VERSION}-${CUDNN_VERSION}-${PUBLISH_VERSION} as base
@@ -41,6 +41,10 @@ RUN set -ex \
   && chmod 777 /etc/supervisor \
   && chown -R appuser:appuser /app 
 
+# Set environment variables for CUDA
+ENV PATH /opt/conda/bin:$PATH
+ENV LD_LIBRARY_PATH /opt/conda/lib:$LD_LIBRARY_PATH
+
 # Switch to the non-privileged user to run the application.
 USER appuser
 
@@ -58,5 +62,12 @@ HEALTHCHECK CMD curl -fs http://localhost:55177/ais/api/v1/health || exit 1
 
 # Run the application.
 ENTRYPOINT ["/usr/bin/supervisord", "-n"]
+
+# 主要测试步骤
+# export PATH=/opt/conda/bin:$PATH
+# export LD_LIBRARY_PATH=/opt/conda/lib:$LD_LIBRARY_PATH
+# source ~/.bashrc
+# tensorflow-2.14.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+# conda install --yes --file requirements.txt
 
 # devel 20 GB
