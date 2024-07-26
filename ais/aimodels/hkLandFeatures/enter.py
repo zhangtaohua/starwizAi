@@ -2,9 +2,6 @@ import os
 import pickle
 import sys
 import warnings
-from datetime import datetime
-from pathlib import Path
-from typing import AnyStr, Optional
 
 import cv2
 import numpy as np
@@ -14,10 +11,7 @@ from osgeo import gdal
 
 from ais.models import AiProjectResultStatus
 from ais.models_utils import updata_ai_project_result_results, updata_ai_project_result_status
-from ais.utils.ai_tools import check_and_download_file
-from utils.clipTiff import clip_tiff_by_band, clip_tiff_by_trans, clip_tiff_by_wrap
-from utils.fileCommon import create_directory
-from utils.geoCommon import get_bbox_from_geojson
+from ais.utils.ai_tools import ai_process_common_preparation
 
 warnings.filterwarnings("ignore")
 
@@ -78,110 +72,59 @@ def get_predict(defined_model, input_tif, output_png):
 
 
 def task_finish(task: Task):
-    print("任务完成", task)
     task_result = result(task.id)
-    print("任务结果：", task_result)
+    print("Q2 Task finished", task.id, task)
+    print("Q2 Task Result:", task_result)
     # todo 要不要通知 golang 程序处理完成呢？
 
 
 def task_start(input_params):
-    print("任务开始处理：", input_params, type(input_params), "\r\n")
+    print("Q2 Task Start:", input_params, type(input_params), "\r\n")
+
     # 1 参数准备处理
     meta_data = input_params.get("meta")
     result_uuid = meta_data.get("uuid")
-    user_id = meta_data.get("user_id")
-    ai_model_code = meta_data.get("ai_model_code")
-    area = input_params.get("area")
-
-    # 用于生成随时间的AI分析结果存储目录。
-    now = datetime.now()
-    time_dir = now.strftime("%Y-%m-%d")
 
     # 更新 数据库 AI 处理结果进度
     updata_ai_project_result_status(result_uuid, AiProjectResultStatus.IDLE.value, 1)
 
-    origin_data = input_params.get("data")
-    if origin_data:
-        origin_data = origin_data.get("data")
+    md = ai_process_common_preparation(input_params)
+    if md.get("error"):
+        md_status = md.get("status")
+        if md_status == AiProjectResultStatus.FILE_DOWNLOAD_FAILED.value:
+            updata_ai_project_result_status(
+                result_uuid, AiProjectResultStatus.FILE_DOWNLOAD_FAILED.value, 100, "Download file failed!"
+            )
+        elif md_status == AiProjectResultStatus.FILE_PROCESS_FAILED.value:
+            updata_ai_project_result_status(
+                result_uuid,
+                AiProjectResultStatus.FILE_PROCESS_FAILED.value,
+                100,
+                "Extent not found when processing",
+            )
 
-    # 要下载处理的 tiff 目标的 远程Url地址。
-    target_tiff_url = None
-    # 要下载处理的 tiff 目标的 原始bbox。
-    target_origin_bbox = None
-    if origin_data:
-        target_tiff_url = origin_data.get("assets")
-        target_tiff_url = target_tiff_url.get("tiff").get("href")
-        target_origin_bbox = origin_data.get("bbox")
+        # 数据
+        return {"error": True}
 
-    # 下载的tiff 文件路径和名称
-    target_dw_inputfile_path_name = ""
+    updata_ai_project_result_status(result_uuid, AiProjectResultStatus.FILE_DOWNLOAD_SUCCESS.value, 10)
 
-    # 进入AI 处理过程得到的 中间结果 tiff 和 jpg 等
-    output_tiff = ""
-    output_jpg = ""
-    output_bbox = None
-    # AI 输出结果目录
-    output_result_dir = os.path.join(settings.AI_RESULTS_PATH, user_id, time_dir, str(result_uuid))
-    # AI 输出结果返回给前端的目录
-    output_result_url = os.path.join(settings.AI_RESULTS_URL, user_id, time_dir, str(result_uuid))
+    # 真正进行 AI 处理
 
-    # 当为area 处理时，裁剪的tiff url
-    output_process_tiff_url = ""
-    output_png_url = ""
+    area = md.get("area")
+    target_download_tiff_url = md.get("target_download_tiff_url")
 
-    # 2 确认输入文件是否存在，不存在则下载
-    if target_tiff_url:
-        target_dw_inputfile_path_name = check_and_download_file(target_tiff_url)
+    target_md_tiff_url = md.get("target_md_tiff_url")
+    target_md_tiff = md.get("target_md_tiff")
 
-    # 3 处理模型需要参数
-    # 如果文件下载成功，就继续处理
-    if target_dw_inputfile_path_name:
-        updata_ai_project_result_status(result_uuid, AiProjectResultStatus.FILE_DOWNLOAD_SUCCESS.value, 10)
+    target_md_bbox = md.get("target_md_bbox")
 
-        if area == "area":  # 处理部分范围
-            extent = input_params.get("extent")
-            if extent:
-                output_bbox = get_bbox_from_geojson(extent)
-                print("output_bbox: ", output_bbox)
-
-                hand_tiff_name = "handle.tif"
-
-                output_process_tiff_url = os.path.join(output_result_url, hand_tiff_name)
-                output_tiff = os.path.join(output_result_dir, hand_tiff_name)
-                output_jpg = os.path.join(output_result_dir, "handle.jpg")
-
-                # 创建存储目录
-                create_directory(output_tiff)
-                # 裁剪tiff
-                clip_tiff_by_trans(target_dw_inputfile_path_name, output_tiff, output_bbox, target_origin_bbox)
-                # clip_tiff_by_band(target_dw_inputfile_path_name, output_tiff, output_bbox, target_origin_bbox)
-
-                # 剪裁成 png jpg
-                # clip_tiff_to_img_by_wrap(target_dw_inputfile_path_name, output_jpg, output_bbox)
-            else:
-                print("Error: Extent not found when processing")
-                updata_ai_project_result_status(
-                    result_uuid,
-                    AiProjectResultStatus.FILE_PROCESS_FAILED.value,
-                    100,
-                    "Extent not found when processing",
-                )
-        elif area == "whole":
-            print("whole process second stage")
-    else:
-        # 文件下载失败有问题 记录日志
-        print("Error: File is not exist, AI cannot goon handling")
-        output_tiff = ""
-        output_bbox = None
-        updata_ai_project_result_status(
-            result_uuid, AiProjectResultStatus.FILE_DOWNLOAD_FAILED.value, 100, "Download file failed!"
-        )
-        return None
+    output_result_url = md.get("output_result_url")
+    output_result_dir = md.get("output_result_dir")
 
     # 4 开启新的进程进行后台处理
     try_ai_count = int(settings.MAX_TRY_AI_PROCESS_TIMES)
     for _ in range(try_ai_count):
-        if area == "area" and output_tiff:
+        if area == "area" and target_md_tiff:
             # 更新处理进度
             updata_ai_project_result_status(result_uuid, AiProjectResultStatus.AI_PROCESSING.value, 20)
 
@@ -191,15 +134,15 @@ def task_start(input_params):
 
             ai_result = False
             try:
-                ai_result = get_predict(model_path, output_tiff, output_result_file_name)
+                ai_result = get_predict(model_path, target_md_tiff, output_result_file_name)
                 if ai_result:
                     save_res = {
                         "base_dir_url": settings.PRODUCT_ASSETS_BASE_DIR,
-                        "input_origin_tiff": target_dw_inputfile_path_name,
-                        "input_process_tiff": output_process_tiff_url,
+                        "input_origin_tiff": target_download_tiff_url,
+                        "input_process_tiff": target_md_tiff_url,
                         "output_png": output_png_url,
                         "area": area,
-                        "output_bbox": output_bbox,
+                        "output_bbox": target_md_bbox,
                     }
                     updata_ai_project_result_results(
                         result_uuid, AiProjectResultStatus.AI_PROCESS_DONE.value, 100, save_res
@@ -207,7 +150,7 @@ def task_start(input_params):
                 else:
                     updata_ai_project_result_status(result_uuid, AiProjectResultStatus.AI_PROCESS_FAILED.value, 100)
             except Exception as e:
-                print("AI 任务失败", e)
+                print("AI Task Failed", e)
                 ai_result = False
                 updata_ai_project_result_status(result_uuid, AiProjectResultStatus.AI_PROCESS_FAILED.value, 100)
 
@@ -219,12 +162,12 @@ def task_start(input_params):
             break
             # 4 处理结果 并 返回
             # updata_ai_project_result_status(result_uuid, AiProjectResultStatus.AI_PROCESS_DONE.value, 100)
-    return {"extent": "", "result": ""}
+    return {"error": False, "extent": "", "result": ""}
 
 
 def StartProcess(input_params):
     # 1 较验项目参数是否正确
-    print("随机树分类任务开始处理：\r\n")
+    print("HK Random Forest Classifier start processing\r\n")
     # 2 开启异步任务处理
     async_task(task_start, input_params, q_options={"task_name": input_params.get("uuid"), "hook": task_finish})
 

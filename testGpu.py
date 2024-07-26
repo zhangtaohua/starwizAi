@@ -11,6 +11,7 @@ def main():
     print("pytorch cuda 版本：", torch.version.cuda)
     print("pytorch GPU 是否可用", torch.cuda.is_available())
     print("pytorch GPU 可用数据", torch.cuda.device_count())
+    print("pytorch GPU name", torch.cuda.get_device_name(0))
 
     tf.debugging.set_log_device_placement(True)
     gpus = tf.config.list_logical_devices("GPU")
